@@ -1,30 +1,40 @@
 # pip install streamlit textblob PyPDF2 nltk
 
+# pip install streamlit nltk PyPDF2
+
 import streamlit as st
-from textblob import TextBlob
-import PyPDF2
 from collections import Counter
+import PyPDF2
 import nltk
 from nltk.corpus import stopwords
+from nltk.sentiment import SentimentIntensityAnalyzer
 
+# -------------------------------
+# NLTK downloads
+# -------------------------------
 nltk.download('stopwords', quiet=True)
+nltk.download('vader_lexicon', quiet=True)
+
+stop_words = set(stopwords.words('english'))
+sia = SentimentIntensityAnalyzer()
 
 # -------------------------------
 # Initialize session state
 # -------------------------------
 if "comments" not in st.session_state:
-    st.session_state["comments"] = []  # List of dicts: {name, comment, sentiment}
+    st.session_state["comments"] = []  # list of dicts: {name, comment, sentiment}
 
 
 # -------------------------------
-# Sentiment Analysis
+# Sentiment Analysis (VADER)
 # -------------------------------
 def analyze_sentiment(text):
-    """Return sentiment category: Positive, Negative, Neutral"""
-    polarity = TextBlob(text).sentiment.polarity
-    if polarity > 0.1:
+    """Return sentiment category using VADER"""
+    scores = sia.polarity_scores(text)
+    compound = scores['compound']
+    if compound >= 0.05:
         return "Positive"
-    elif polarity < -0.1:
+    elif compound <= -0.05:
         return "Negative"
     else:
         return "Neutral"
@@ -57,7 +67,7 @@ def user_page():
 def admin_page():
     st.title("🛠️ Admin Page")
 
-    # Upload PDF
+    # Upload PDF proposal
     uploaded_file = st.file_uploader("📄 Upload Proposal (PDF)", type="pdf")
     if uploaded_file:
         pdf_reader = PyPDF2.PdfReader(uploaded_file)
@@ -74,7 +84,7 @@ def admin_page():
         st.info("No comments yet.")
         return
 
-    # Show all comments with delete buttons
+    # Display comments with delete buttons
     st.write("### All Comments")
     for i, c in enumerate(comments):
         st.markdown(f"**{c['name']}**: {c['comment']} _(Sentiment: {c['sentiment']})_")
@@ -89,7 +99,6 @@ def admin_page():
     # Top Words
     # -------------------------------
     st.write("### 🔝 Top Words Used")
-    stop_words = set(stopwords.words('english'))
     all_words = [
         word for word in " ".join([c["comment"] for c in comments]).lower().split()
         if word.isalpha() and word not in stop_words
@@ -118,7 +127,4 @@ if page == "User":
     user_page()
 else:
     admin_page()
-
-
-
 
