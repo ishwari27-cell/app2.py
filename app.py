@@ -1,16 +1,14 @@
-# pip install streamlit textblob PyPDF2 nltk
-
-# pip install streamlit nltk PyPDF2
+# pip install streamlit nltk pdfplumber
 
 import streamlit as st
 from collections import Counter
-import PyPDF2
+import pdfplumber
 import nltk
 from nltk.corpus import stopwords
 from nltk.sentiment import SentimentIntensityAnalyzer
 
 # -------------------------------
-# NLTK downloads
+# NLTK Downloads
 # -------------------------------
 nltk.download('stopwords', quiet=True)
 nltk.download('vader_lexicon', quiet=True)
@@ -19,14 +17,13 @@ stop_words = set(stopwords.words('english'))
 sia = SentimentIntensityAnalyzer()
 
 # -------------------------------
-# Initialize session state
+# Initialize Session State
 # -------------------------------
 if "comments" not in st.session_state:
-    st.session_state["comments"] = []  # list of dicts: {name, comment, sentiment}
-
+    st.session_state["comments"] = []  # List of dicts: {name, comment, sentiment}
 
 # -------------------------------
-# Sentiment Analysis (VADER)
+# Sentiment Analysis
 # -------------------------------
 def analyze_sentiment(text):
     """Return sentiment category using VADER"""
@@ -38,7 +35,6 @@ def analyze_sentiment(text):
         return "Negative"
     else:
         return "Neutral"
-
 
 # -------------------------------
 # User Page
@@ -60,20 +56,21 @@ def user_page():
         else:
             st.error("⚠️ Please enter both name and comment.")
 
-
 # -------------------------------
 # Admin Page
 # -------------------------------
 def admin_page():
     st.title("🛠️ Admin Page")
 
-    # Upload PDF proposal
+    # Upload PDF proposal using pdfplumber
     uploaded_file = st.file_uploader("📄 Upload Proposal (PDF)", type="pdf")
     if uploaded_file:
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
         proposal_text = ""
-        for page in pdf_reader.pages:
-            proposal_text += page.extract_text() or ""
+        with pdfplumber.open(uploaded_file) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    proposal_text += text + "\n"
         st.subheader("Proposal Content")
         st.write(proposal_text)
 
@@ -116,7 +113,6 @@ def admin_page():
     sentiment_counts = Counter(sentiments)
     st.bar_chart(dict(sentiment_counts))
 
-
 # -------------------------------
 # Navigation
 # -------------------------------
@@ -127,4 +123,3 @@ if page == "User":
     user_page()
 else:
     admin_page()
-
