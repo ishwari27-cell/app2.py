@@ -5,7 +5,7 @@ from collections import Counter
 # Initialize session state
 # -------------------------------
 if "comments" not in st.session_state:
-    st.session_state["comments"] = []  # List of dicts: {name, comment, sentiment}
+    st.session_state["comments"] = []  # list of dicts: {name, comment, sentiment}
 if "proposal_file" not in st.session_state:
     st.session_state["proposal_file"] = None  # Uploaded PDF
 
@@ -38,22 +38,25 @@ def admin_page():
         st.session_state["proposal_file"] = uploaded_file
         st.success("✅ Proposal uploaded successfully!")
 
-    # Show comments analysis
+    # Comments analysis
     comments = st.session_state["comments"]
     st.subheader("📊 Comments Analysis")
     if not comments:
         st.info("No comments yet.")
         return
 
+    # Display comments with safe deletion
     st.write("### All Comments")
+    delete_index = None  # Track which comment to delete
     for i, c in enumerate(comments):
         st.markdown(f"**{c['name']}**: {c['comment']} _(Sentiment: {c['sentiment']})_")
         delete_key = f"delete_{i}"
-        if delete_key not in st.session_state:
-            st.session_state[delete_key] = False
         if st.button(f"🗑️ Delete Comment {i+1}", key=delete_key):
-            st.session_state["comments"].pop(i)
-            st.experimental_rerun()
+            delete_index = i
+
+    if delete_index is not None:
+        st.session_state["comments"].pop(delete_index)
+        st.experimental_rerun()
 
     # Top Words
     st.write("### 🔝 Top Words Used")
@@ -81,7 +84,8 @@ def user_page():
 
     # Show proposal if uploaded
     if st.session_state["proposal_file"]:
-        st.download_button("📥 Download Proposal", st.session_state["proposal_file"], file_name=st.session_state["proposal_file"].name)
+        st.download_button("📥 Download Proposal", st.session_state["proposal_file"],
+                           file_name=st.session_state["proposal_file"].name)
         st.info("Read the proposal before commenting.")
     else:
         st.warning("No proposal uploaded yet. Please check back later.")
