@@ -1,20 +1,5 @@
-# pip install streamlit nltk
-
 import streamlit as st
 from collections import Counter
-import nltk
-from nltk.corpus import stopwords
-from nltk.sentiment import SentimentIntensityAnalyzer
-import base64
-
-# -------------------------------
-# NLTK setup
-# -------------------------------
-nltk.download('stopwords', quiet=True)
-nltk.download('vader_lexicon', quiet=True)
-
-stop_words = set(stopwords.words('english'))
-sia = SentimentIntensityAnalyzer()
 
 # -------------------------------
 # Initialize session state
@@ -23,15 +8,19 @@ if "comments" not in st.session_state:
     st.session_state["comments"] = []  # list of dicts: {name, comment, sentiment}
 
 # -------------------------------
-# Sentiment Analysis
+# Simple sentiment analysis (Streamlit-native)
 # -------------------------------
+positive_words = ["good", "great", "excellent", "love", "happy", "nice", "awesome", "like"]
+negative_words = ["bad", "poor", "terrible", "hate", "sad", "worst", "dislike", "awful"]
+
 def analyze_sentiment(text):
-    """Return sentiment category using VADER"""
-    scores = sia.polarity_scores(text)
-    compound = scores['compound']
-    if compound >= 0.05:
+    """Simple keyword-based sentiment detection"""
+    text = text.lower()
+    pos_count = sum(text.count(word) for word in positive_words)
+    neg_count = sum(text.count(word) for word in negative_words)
+    if pos_count > neg_count:
         return "Positive"
-    elif compound <= -0.05:
+    elif neg_count > pos_count:
         return "Negative"
     else:
         return "Neutral"
@@ -45,15 +34,9 @@ def user_page():
 
     uploaded_file = st.file_uploader("📄 Upload Proposal (PDF)", type="pdf", key="user_pdf")
     if uploaded_file:
-        # Display PDF download button
         st.download_button("📥 Download PDF", uploaded_file, file_name=uploaded_file.name)
+        st.info("PDF is available for download. Read it before commenting.")
 
-        # Embed PDF for viewing
-        base64_pdf = base64.b64encode(uploaded_file.read()).decode('utf-8')
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="500" type="application/pdf"></iframe>'
-        st.components.v1.html(pdf_display, height=500)
-
-    # User comment section
     name = st.text_input("Your Name")
     comment = st.text_area("Your Comment")
 
@@ -80,7 +63,6 @@ def admin_page():
         st.info("No comments yet.")
         return
 
-    # Display comments with delete buttons
     st.write("### All Comments")
     for i, c in enumerate(comments):
         st.markdown(f"**{c['name']}**: {c['comment']} _(Sentiment: {c['sentiment']})_")
@@ -91,22 +73,18 @@ def admin_page():
             st.session_state["comments"].pop(i)
             st.experimental_rerun()
 
-    # -------------------------------
     # Top Words
-    # -------------------------------
     st.write("### 🔝 Top Words Used")
     all_words = [
         word for word in " ".join([c["comment"] for c in comments]).lower().split()
-        if word.isalpha() and word not in stop_words
+        if word.isalpha()
     ]
     common_words = Counter(all_words).most_common(10)
     if common_words:
         st.table(common_words)
         st.bar_chart(dict(common_words))
 
-    # -------------------------------
     # Sentiment Distribution
-    # -------------------------------
     st.write("### 📈 Sentiment Distribution")
     sentiments = [c["sentiment"] for c in comments]
     sentiment_counts = Counter(sentiments)
@@ -122,5 +100,4 @@ if page == "User":
     user_page()
 else:
     admin_page()
-
 
