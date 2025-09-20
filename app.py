@@ -1,14 +1,14 @@
-# pip install streamlit nltk pdfplumber
+# pip install streamlit nltk
 
 import streamlit as st
 from collections import Counter
-import pdfplumber
 import nltk
 from nltk.corpus import stopwords
 from nltk.sentiment import SentimentIntensityAnalyzer
+import base64
 
 # -------------------------------
-# NLTK Downloads
+# NLTK setup
 # -------------------------------
 nltk.download('stopwords', quiet=True)
 nltk.download('vader_lexicon', quiet=True)
@@ -17,10 +17,10 @@ stop_words = set(stopwords.words('english'))
 sia = SentimentIntensityAnalyzer()
 
 # -------------------------------
-# Initialize Session State
+# Initialize session state
 # -------------------------------
 if "comments" not in st.session_state:
-    st.session_state["comments"] = []  # List of dicts: {name, comment, sentiment}
+    st.session_state["comments"] = []  # list of dicts: {name, comment, sentiment}
 
 # -------------------------------
 # Sentiment Analysis
@@ -41,8 +41,19 @@ def analyze_sentiment(text):
 # -------------------------------
 def user_page():
     st.title("💬 User Page")
-    st.write("Enter your name and comment on the uploaded proposal:")
+    st.write("View the proposal and submit your comment:")
 
+    uploaded_file = st.file_uploader("📄 Upload Proposal (PDF)", type="pdf", key="user_pdf")
+    if uploaded_file:
+        # Display PDF download button
+        st.download_button("📥 Download PDF", uploaded_file, file_name=uploaded_file.name)
+
+        # Embed PDF for viewing
+        base64_pdf = base64.b64encode(uploaded_file.read()).decode('utf-8')
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="500" type="application/pdf"></iframe>'
+        st.components.v1.html(pdf_display, height=500)
+
+    # User comment section
     name = st.text_input("Your Name")
     comment = st.text_area("Your Comment")
 
@@ -61,20 +72,8 @@ def user_page():
 # -------------------------------
 def admin_page():
     st.title("🛠️ Admin Page")
+    st.write("Users' comments analysis:")
 
-    # Upload PDF proposal using pdfplumber
-    uploaded_file = st.file_uploader("📄 Upload Proposal (PDF)", type="pdf")
-    if uploaded_file:
-        proposal_text = ""
-        with pdfplumber.open(uploaded_file) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    proposal_text += text + "\n"
-        st.subheader("Proposal Content")
-        st.write(proposal_text)
-
-    st.subheader("📊 Comments Analysis")
     comments = st.session_state["comments"]
 
     if not comments:
@@ -123,3 +122,5 @@ if page == "User":
     user_page()
 else:
     admin_page()
+
+
