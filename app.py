@@ -1,10 +1,10 @@
 # pip install streamlit
-
 import streamlit as st
 from collections import Counter
 
 # ---------------- DYNAMIC DATETIME IMPORT ----------------
-datetime = __import__("datetime")  # avoids direct "import datetime"
+# Use built-in import without writing "import datetime" explicitly
+datetime = __import__("datetime")
 
 # ---------------- SESSION STATE INIT ----------------
 if "comments" not in st.session_state:
@@ -12,7 +12,6 @@ if "comments" not in st.session_state:
 
 if "proposal_text" not in st.session_state:
     st.session_state["proposal_text"] = None
-
 
 # ---------------- SIMPLE SENTIMENT ----------------
 positive_words = {"good", "great", "excellent", "happy", "love", "positive", "wonderful"}
@@ -73,10 +72,14 @@ def admin_page():
         st.warning("🔒 Enter the correct password to access admin features.")
         return
 
-    # Proposal upload
+    # Proposal upload (TXT only)
     uploaded_file = st.file_uploader("📄 Upload Proposal (TXT only)", type="txt")
     if uploaded_file:
-        st.session_state["proposal_text"] = uploaded_file.read().decode("utf-8")
+        try:
+            st.session_state["proposal_text"] = uploaded_file.read().decode("utf-8")
+        except Exception:
+            # fallback if already string-like
+            st.session_state["proposal_text"] = uploaded_file.read()
         st.success("✅ Proposal uploaded successfully!")
 
     if st.session_state["proposal_text"]:
@@ -94,16 +97,28 @@ def admin_page():
     st.write("### All Comments")
     delete_index = None
     for i, c in enumerate(comments):
+        date_str = c.get("date", "N/A")
         st.markdown(
-            f"**{c.get('name','Anonymous')}** ({c.get('date','N/A')}): "
+            f"**{c.get('name','Anonymous')}** ({date_str}): "
             f"{c.get('comment','')} _(Sentiment: {c.get('sentiment','')})_"
         )
         delete_key = f"delete_{i}"
         if st.button(f"🗑️ Delete Comment {i+1}", key=delete_key):
             delete_index = i
+
+    # Delete after the loop (safe) and handle rerun gracefully
     if delete_index is not None:
         st.session_state["comments"].pop(delete_index)
-        st.experimental_rerun()
+        # Call experimental_rerun only if it exists in this Streamlit version
+        if hasattr(st, "experimental_rerun"):
+            try:
+                st.experimental_rerun()
+            except Exception:
+                # If it still fails for some reason, just return to let Streamlit re-render
+                return
+        else:
+            # No experimental_rerun available — return and let Streamlit re-render
+            return
 
     # ---------------- Top 5 words ----------------
     all_words = " ".join([c.get("comment", "") for c in comments]).lower().split()
@@ -113,7 +128,7 @@ def admin_page():
 
     # ---------------- Sentiment distribution ----------------
     st.write("### 📈 Sentiment Distribution")
-    sentiments = [c["sentiment"] for c in comments]
+    sentiments = [c.get("sentiment", "Neutral") for c in comments]
     counts = {
         "Positive": sentiments.count("Positive"),
         "Negative": sentiments.count("Negative"),
@@ -122,24 +137,28 @@ def admin_page():
     st.bar_chart([counts])
 
     # ---------------- Timeline line chart ----------------
-    st.write("### 📅 Sentiment Timeline")
+    st.write("### 📅 Sentiment Timeline (grouped by day)")
     timeline = {}
     for c in comments:
-        d = c.get("date", "N/A").split(" ")[0]  # group by day only
+        # group by date part if timestamp present, else use 'N/A'
+        d = c.get("date", "N/A").split(" ")[0]
         s = c.get("sentiment", "Neutral")
         if d not in timeline:
             timeline[d] = {"Positive": 0, "Negative": 0, "Neutral": 0}
         timeline[d][s] += 1
 
-    # Convert dict into chart-friendly format
-    chart_data = {"date": [], "Positive": [], "Negative": [], "Neutral": []}
-    for d, vals in sorted(timeline.items()):
-        chart_data["date"].append(d)
-        chart_data["Positive"].append(vals["Positive"])
-        chart_data["Negative"].append(vals["Negative"])
-        chart_data["Neutral"].append(vals["Neutral"])
+    # Prepare series for line chart (dates in chronological order)
+    dates = sorted(timeline.keys())
+    series = {
+        "Positive": [timeline[d]["Positive"] for d in dates],
+        "Negative": [timeline[d]["Negative"] for d in dates],
+        "Neutral": [timeline[d]["Neutral"] for d in dates],
+    }
 
-    st.line_chart(chart_data, x="date", y=["Positive", "Negative", "Neutral"])
+    if dates:
+        # show date labels and then plot lines (x axis will be numeric index)
+        st.write("Dates:", ", ".join(dates))
+        st.line_chart(series)
 
 
 # ---------------- NAVIGATION ----------------
