@@ -1,5 +1,5 @@
 import streamlit as st
-from collections import Counter
+from collections import Counter, defaultdict
 
 # -------------------------------
 # Admin password
@@ -67,7 +67,7 @@ def admin_page():
     st.write("### All Comments")
     delete_index = None
     for i, c in enumerate(comments):
-        st.markdown(f"**{c['name']}**: {c['comment']} _(Sentiment: {c['sentiment']})_")
+        st.markdown(f"**{c['name']}** ({c['date']}): {c['comment']} _(Sentiment: {c['sentiment']})_")
         delete_key = f"delete_{i}"
         if st.button(f"🗑️ Delete Comment {i+1}", key=delete_key):
             delete_index = i
@@ -81,6 +81,7 @@ def admin_page():
     common_words = Counter(all_words).most_common(10)
     if common_words:
         st.table(common_words)
+        st.bar_chart(dict(common_words))
 
     # Sentiment Distribution
     st.write("### 📈 Sentiment Distribution")
@@ -88,18 +89,21 @@ def admin_page():
     sentiment_counts = Counter(sentiments)
     st.bar_chart(dict(sentiment_counts))
 
-    # Simulated Word Cloud
-    st.write("### ☁️ Word Cloud (Simulated)")
-    if common_words:
-        word_cloud_html = ""
-        max_count = common_words[0][1]
-        min_font = 15
-        max_font = 50
-        for word, count in common_words:
-            # scale font size
-            font_size = min_font + (count / max_count) * (max_font - min_font)
-            word_cloud_html += f'<span style="font-size:{int(font_size)}px; margin:5px;">{word}</span>'
-        st.markdown(word_cloud_html, unsafe_allow_html=True)
+    # Timeline Sentiment Line Graph
+    st.write("### 📅 Sentiment Timeline (by Day)")
+    timeline = defaultdict(lambda: {"Positive": 0, "Negative": 0, "Neutral": 0})
+    for c in comments:
+        timeline[c["date"]][c["sentiment"]] += 1
+
+    if timeline:
+        # Convert into Streamlit-friendly format (dict of lists)
+        dates = sorted(timeline.keys())
+        data = {
+            "Positive": [timeline[d]["Positive"] for d in dates],
+            "Negative": [timeline[d]["Negative"] for d in dates],
+            "Neutral": [timeline[d]["Neutral"] for d in dates],
+        }
+        st.line_chart(data, x=dates)
 
 # -------------------------------
 # User Page
@@ -119,18 +123,21 @@ def user_page():
     name = st.text_input("Your Name")
     comment = st.text_area("Your Comment")
 
+    # Use Streamlit's date input instead of datetime.now()
+    today = st.date_input("Comment Date", value=None, key="comment_date")
+
     if st.button("Submit Comment"):
         if not st.session_state["proposal_file"]:
             st.error("Cannot submit comment because no proposal is available.")
             return
-        if name.strip() and comment.strip():
+        if name.strip() and comment.strip() and today:
             sentiment = analyze_sentiment(comment)
             st.session_state["comments"].append(
-                {"name": name, "comment": comment, "sentiment": sentiment}
+                {"name": name, "comment": comment, "sentiment": sentiment, "date": str(today)}
             )
             st.success("✅ Comment submitted successfully!")
         else:
-            st.error("⚠️ Please enter both name and comment.")
+            st.error("⚠️ Please enter name, comment, and select a date.")
 
 # -------------------------------
 # Navigation
