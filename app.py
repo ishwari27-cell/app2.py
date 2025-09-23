@@ -127,6 +127,26 @@ def admin_page():
         mneu = [monthly[m]["Neutral"] for m in months]
         st.line_chart({"Positive": mpos, "Negative": mneg, "Neutral": mneu})
 
+        # Monthly aggregation (fixed)
+st.write("### 🗓️ Timeline of Comments (Monthly)")
+monthly = defaultdict(lambda: {"Positive": 0, "Negative": 0, "Neutral": 0})
+for c in comments:
+    d, m, y = c["date"].split("-")  # correct unpacking
+    key = f"{m}-{y}"                # month-year key
+    monthly[key][c["sentiment"]] += 1
+
+months = list(monthly.keys())
+mpos = [monthly[m]["Positive"] for m in months]
+mneg = [monthly[m]["Negative"] for m in months]
+mneu = [monthly[m]["Neutral"] for m in months]
+
+st.line_chart({
+    "Positive": mpos,
+    "Negative": mneg,
+    "Neutral": mneu
+})
+
+
 
 # -------------------------
 # User Page
