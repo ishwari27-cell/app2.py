@@ -19,6 +19,7 @@ def analyze_sentiment(text):
     else:
         return "Neutral"
 
+
 # -------------------------
 # Initialize session state
 # -------------------------
@@ -27,6 +28,33 @@ if "proposal_pdf" not in st.session_state:
     st.session_state["proposal_name"] = None
 if "comments" not in st.session_state:
     st.session_state["comments"] = []  # {name, comment, sentiment, date}
+if "day" not in st.session_state:
+    st.session_state["day"] = 1
+if "month" not in st.session_state:
+    st.session_state["month"] = 1
+if "year" not in st.session_state:
+    st.session_state["year"] = 2025
+
+
+# -------------------------
+# Helper to simulate dates
+# -------------------------
+def get_next_date():
+    d, m, y = st.session_state["day"], st.session_state["month"], st.session_state["year"]
+    # Save current date
+    date_str = f"{d:02d}-{m:02d}-{y}"
+    # Increment date
+    d += 1
+    if d > 30:  # simulate 30 days per month
+        d = 1
+        m += 1
+    if m > 12:  # simulate 12 months per year
+        m = 1
+        y += 1
+    # Update state
+    st.session_state["day"], st.session_state["month"], st.session_state["year"] = d, m, y
+    return date_str
+
 
 # -------------------------
 # Admin Page
@@ -72,23 +100,32 @@ def admin_page():
         sentiment_counts = Counter(sentiments)
         st.bar_chart({"Sentiment": list(sentiment_counts.values())}, x=None)
 
-        # Timeline analysis (by comment index as "day")
-        st.write("### 📅 Timeline of Comments")
+        # Timeline by date
+        st.write("### 📅 Timeline of Comments (Daily)")
         timeline = defaultdict(lambda: {"Positive": 0, "Negative": 0, "Neutral": 0})
-        for idx, c in enumerate(comments, start=1):
-            timeline[idx][c["sentiment"]] += 1
+        for c in comments:
+            timeline[c["date"]][c["sentiment"]] += 1
 
-        # Prepare data for chart
         days = list(timeline.keys())
         pos = [timeline[d]["Positive"] for d in days]
         neg = [timeline[d]["Negative"] for d in days]
         neu = [timeline[d]["Neutral"] for d in days]
+        st.line_chart({"Positive": pos, "Negative": neg, "Neutral": neu})
 
-        st.line_chart({
-            "Positive": pos,
-            "Negative": neg,
-            "Neutral": neu
-        })
+        # Monthly aggregation
+        st.write("### 🗓️ Timeline of Comments (Monthly)")
+        monthly = defaultdict(lambda: {"Positive": 0, "Negative": 0, "Neutral": 0})
+        for c in comments:
+            # Extract month-year from date string
+            _, m, y = c["date"].split("-")
+            key = f"{m}-{y}"
+            monthly[key][c["sentiment"]] += 1
+
+        months = list(monthly.keys())
+        mpos = [monthly[m]["Positive"] for m in months]
+        mneg = [monthly[m]["Negative"] for m in months]
+        mneu = [monthly[m]["Neutral"] for m in months]
+        st.line_chart({"Positive": mpos, "Negative": mneg, "Neutral": mneu})
 
 
 # -------------------------
@@ -115,11 +152,12 @@ def user_page():
     if st.button("Submit Comment"):
         if name.strip() and comment.strip():
             sentiment = analyze_sentiment(comment)
+            date_str = get_next_date()
             comment_data = {
                 "name": name,
                 "comment": comment,
                 "sentiment": sentiment,
-                "date": f"Day {len(st.session_state['comments'])+1}"  # fake date
+                "date": date_str
             }
             st.session_state["comments"].append(comment_data)
             st.success("✅ Comment submitted successfully!")
@@ -135,7 +173,3 @@ if page == "User":
     user_page()
 else:
     admin_page()
-
-    
-    
-  
