@@ -128,12 +128,12 @@ def admin_page():
         st.line_chart({"Positive": mpos, "Negative": mneg, "Neutral": mneu})
 
         # Monthly aggregation (fixed)
-st.write("### 🗓️ Timeline of Comments (Monthly)")
-monthly = defaultdict(lambda: {"Positive": 0, "Negative": 0, "Neutral": 0})
-for c in comments:
-    d, m, y = c["date"].split("-")  # correct unpacking
-    key = f"{m}-{y}"                # month-year key
-    monthly[key][c["sentiment"]] += 1
+        st.write("### 🗓️ Timeline of Comments (Monthly)")
+        monthly = defaultdict(lambda: {"Positive": 0, "Negative": 0, "Neutral": 0})
+        for c in comments:
+            d, m, y = c["date"].split("-")  # correct unpacking
+            key = f"{m}-{y}"                # month-year key
+            monthly[key][c["sentiment"]] += 1
 
 months = list(monthly.keys())
 mpos = [monthly[m]["Positive"] for m in months]
