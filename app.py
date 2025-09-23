@@ -1,22 +1,22 @@
-# pip install streamlit
 import streamlit as st
 from collections import Counter
 
 # ---------------- DYNAMIC DATETIME IMPORT ----------------
-# Use built-in import without writing "import datetime" explicitly
 datetime = __import__("datetime")
 
 # ---------------- SESSION STATE INIT ----------------
 if "comments" not in st.session_state:
     st.session_state["comments"] = []  # list of dicts: {name, comment, sentiment, date}
 
-if "proposal_text" not in st.session_state:
-    st.session_state["proposal_text"] = None
+if "proposal_pdf" not in st.session_state:
+    st.session_state["proposal_pdf"] = None
+
+if "proposal_name" not in st.session_state:
+    st.session_state["proposal_name"] = None
 
 # ---------------- SIMPLE SENTIMENT ----------------
 positive_words = {"good", "great", "excellent", "happy", "love", "positive", "wonderful"}
 negative_words = {"bad", "sad", "poor", "terrible", "hate", "negative", "angry"}
-
 
 def simple_sentiment(text: str) -> str:
     words = text.lower().split()
@@ -29,15 +29,19 @@ def simple_sentiment(text: str) -> str:
     else:
         return "Neutral"
 
-
 # ---------------- USER PAGE ----------------
 def user_page():
     st.title("💬 User Page")
 
     # Show uploaded proposal if available
-    if st.session_state["proposal_text"]:
+    if st.session_state["proposal_pdf"]:
         st.subheader("📄 Current Proposal")
-        st.write(st.session_state["proposal_text"])
+        st.download_button(
+            label="📥 Download Proposal",
+            data=st.session_state["proposal_pdf"],
+            file_name=st.session_state["proposal_name"] or "proposal.pdf",
+            mime="application/pdf"
+        )
     else:
         st.info("No proposal uploaded yet. Please wait for the admin.")
 
@@ -61,7 +65,6 @@ def user_page():
         else:
             st.error("⚠️ Please enter both name and comment.")
 
-
 # ---------------- ADMIN PAGE ----------------
 def admin_page():
     st.title("🛠️ Admin Page")
@@ -72,19 +75,21 @@ def admin_page():
         st.warning("🔒 Enter the correct password to access admin features.")
         return
 
-    # Proposal upload (TXT only)
-    uploaded_file = st.file_uploader("📄 Upload Proposal (TXT only)", type="txt")
+    # Proposal upload (PDF only)
+    uploaded_file = st.file_uploader("📄 Upload Proposal (PDF)", type="pdf")
     if uploaded_file:
-        try:
-            st.session_state["proposal_text"] = uploaded_file.read().decode("utf-8")
-        except Exception:
-            # fallback if already string-like
-            st.session_state["proposal_text"] = uploaded_file.read()
-        st.success("✅ Proposal uploaded successfully!")
+        st.session_state["proposal_pdf"] = uploaded_file.read()
+        st.session_state["proposal_name"] = uploaded_file.name
+        st.success("✅ PDF Proposal uploaded successfully!")
 
-    if st.session_state["proposal_text"]:
+    if st.session_state["proposal_pdf"]:
         st.subheader("📄 Current Proposal")
-        st.write(st.session_state["proposal_text"])
+        st.download_button(
+            label="📥 Download Proposal",
+            data=st.session_state["proposal_pdf"],
+            file_name=st.session_state["proposal_name"] or "proposal.pdf",
+            mime="application/pdf"
+        )
 
     st.subheader("📊 Comments Analysis")
     comments = st.session_state["comments"]
@@ -106,19 +111,9 @@ def admin_page():
         if st.button(f"🗑️ Delete Comment {i+1}", key=delete_key):
             delete_index = i
 
-    # Delete after the loop (safe) and handle rerun gracefully
     if delete_index is not None:
         st.session_state["comments"].pop(delete_index)
-        # Call experimental_rerun only if it exists in this Streamlit version
-        if hasattr(st, "experimental_rerun"):
-            try:
-                st.experimental_rerun()
-            except Exception:
-                # If it still fails for some reason, just return to let Streamlit re-render
-                return
-        else:
-            # No experimental_rerun available — return and let Streamlit re-render
-            return
+        return
 
     # ---------------- Top 5 words ----------------
     all_words = " ".join([c.get("comment", "") for c in comments]).lower().split()
@@ -140,30 +135,23 @@ def admin_page():
     st.write("### 📅 Sentiment Timeline (grouped by day)")
     timeline = {}
     for c in comments:
-        # group by date part if timestamp present, else use 'N/A'
         d = c.get("date", "N/A").split(" ")[0]
         s = c.get("sentiment", "Neutral")
         if d not in timeline:
             timeline[d] = {"Positive": 0, "Negative": 0, "Neutral": 0}
         timeline[d][s] += 1
 
-    # Prepare series for line chart (dates in chronological order)
-    dates = sorted(timeline.keys())
-    series = {
-        "Positive": [timeline[d]["Positive"] for d in dates],
-        "Negative": [timeline[d]["Negative"] for d in dates],
-        "Neutral": [timeline[d]["Neutral"] for d in dates],
-    }
+    if timeline:
+        st.line_chart(
+            {
+                "Positive": [timeline[d]["Positive"] for d in sorted(timeline.keys())],
+                "Negative": [timeline[d]["Negative"] for d in sorted(timeline.keys())],
+                "Neutral": [timeline[d]["Neutral"] for d in sorted(timeline.keys())],
+            }
+        )
 
-    if dates:
-        # show date labels and then plot lines (x axis will be numeric index)
-        st.write("Dates:", ", ".join(dates))
-        st.line_chart(series)
-
-
-# ---------------- NAVIGATION ----------------
-st.sidebar.title("🔎 Navigation")
-page = st.sidebar.radio("Choose a page:", ["User", "Admin"])
+# ---------------- MAIN APP ----------------
+page = st.sidebar.radio("📌 Navigate", ["User", "Admin"])
 
 if page == "User":
     user_page()
